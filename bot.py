@@ -22,7 +22,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # טוקן הבוט (הכנס את הטוקן שלך)
-TOKEN = "7534270934:AAHCeBZADM58sLJri_v_TJMZwkDxUOhs5bs"
+TOKEN = "8100612494:AAFvDr58G5q9x7ISGi3Ltt-s_Y92wklItBc"
 
 # פונקציה להורדת קובץ מטלגרם
 async def download_telegram_file(file_url: str, file_path: str, update: Update, context: ContextTypes.DEFAULT_TYPE):
