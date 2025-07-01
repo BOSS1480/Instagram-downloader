@@ -1,0 +1,19 @@
+{
+  "name": "Downloader Bot",
+  "description": "Download media from Instagram, TikTok, YouTube and more.",
+  "repository": "https://github.com/your-user/downloader-bot",
+  "env": {
+    "API_ID": { "description": "Get this from https://my.telegram.org" },
+    "API_HASH": { "description": "Get this from https://my.telegram.org" },
+    "BOT_TOKEN": { "description": "Get this from @BotFather" },
+    "MONGO_URI": { "description": "Your MongoDB connection URI" },
+    "MONGO_DB_NAME": { "description": "Name of the database to use" },
+    "ADMIN_ID": { "description": "Your Telegram user ID" },
+    "LOG_CHANNEL": { "description": "Channel ID for logging" }
+  },
+  "buildpacks": [
+    {
+      "url": "heroku/python"
+    }
+  ]
+}
