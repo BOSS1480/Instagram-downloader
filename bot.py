@@ -1,6 +1,6 @@
-import os import logging import yt_dlp from pyrogram import Client, filters from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message from pymongo import MongoClient
+import os import logging import yt_dlp from pyrogram import Client, filters from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message from pymongo import MongoClient import sys
 
-API_ID = int(os.environ.get("API_ID")) API_HASH = os.environ.get("API_HASH") BOT_TOKEN = os.environ.get("BOT_TOKEN") MONGO_URI = os.environ.get("MONGO_URI") MONGO_DB_NAME = os.environ.get("MONGO_DB_NAME")) ADMIN_ID = int(os.environ.get("ADMIN_ID")) LOG_CHANNEL = int(os.environ.get("LOG_CHANNEL"))
+API_ID = int(os.environ.get("API_ID")) API_HASH = os.environ.get("API_HASH") BOT_TOKEN = os.environ.get("BOT_TOKEN") MONGO_URI = os.environ.get("MONGO_URI") MONGO_DB_NAME = os.environ.get("MONGO_DB_NAME") ADMIN_ID = int(os.environ.get("ADMIN_ID")) LOG_CHANNEL = int(os.environ.get("LOG_CHANNEL"))
 
 app = Client("downloader", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN) mongo = MongoClient(MONGO_URI) db = mongo[MONGO_DB_NAME] users_col = db["users"] cookies_path = "cookies.txt"
 
@@ -18,9 +18,7 @@ HELP_TEXT = """ How to use the bot:
 
 Just send a video or image link from supported platforms (TikTok, YouTube, etc.)
 
-Max file size: 500MB
-
-If YouTube download fails, check that admin has uploaded cookies.txt via reply to /cookies """
+Max file size: 500MB """
 
 
 @app.on_message(filters.command("start") & filters.private) def start(client, message): user_id = message.from_user.id if not users_col.find_one({"_id": user_id}): users_col.insert_one({"_id": user_id}) try: app.send_message(LOG_CHANNEL, f"#NewUser\nID: {user_id}\nName: {message.from_user.mention}") except: pass message.reply(START_MSG, reply_markup=BUTTONS)
@@ -29,7 +27,9 @@ If YouTube download fails, check that admin has uploaded cookies.txt via reply t
 
 @app.on_message(filters.command("cookies") & filters.reply & filters.user(ADMIN_ID)) def save_cookies(client, message): if message.reply_to_message.document: file = message.reply_to_message.download(file_name=cookies_path) message.reply("✅ cookies.txt saved.")
 
-@app.on_message(filters.private & filters.text & ~filters.command(["start", "cookies"])) def handle_link(client, message: Message): user_id = message.from_user.id url = message.text.strip() try: app.send_message(LOG_CHANNEL, f"#NewLink\nUser: {message.from_user.mention}\nLink: {url}") except: pass processing = message.reply("🔄 Downloading...")
+@app.on_message(filters.command("restart") & filters.user(ADMIN_ID)) def restart(client, message): message.reply("♻️ Restarting bot...") os.execv(sys.executable, ['python'] + sys.argv)
+
+@app.on_message(filters.private & filters.text & ~filters.command(["start", "cookies", "restart"])) def handle_link(client, message: Message): user_id = message.from_user.id url = message.text.strip() try: app.send_message(LOG_CHANNEL, f"#NewLink\nUser: {message.from_user.mention}\nLink: {url}") except: pass processing = message.reply("🔄 Downloading...")
 
 ydl_opts = {
     'format': 'bestvideo+bestaudio/best',
@@ -45,13 +45,32 @@ try:
         info = ydl.extract_info(url, download=True)
         file_path = ydl.prepare_filename(info)
         caption = f"[{info.get('title', 'Downloaded File')}]({url})"
-        reply = app.send_document(
-            message.chat.id,
-            file_path,
-            caption=caption,
-            parse_mode="markdown",
-            reply_to_message_id=message.id
-        )
+        mime = info.get("ext", "")
+
+        if mime in ["mp4", "webm"]:
+            app.send_video(
+                message.chat.id,
+                file_path,
+                caption=caption,
+                parse_mode="markdown",
+                reply_to_message_id=message.id
+            )
+        elif mime in ["jpg", "jpeg", "png", "webp"]:
+            app.send_photo(
+                message.chat.id,
+                file_path,
+                caption=caption,
+                parse_mode="markdown",
+                reply_to_message_id=message.id
+            )
+        else:
+            app.send_document(
+                message.chat.id,
+                file_path,
+                caption=caption,
+                parse_mode="markdown",
+                reply_to_message_id=message.id
+            )
         app.send_message(LOG_CHANNEL, f"✅ Uploaded", reply_to_message_id=processing.id)
 except Exception as e:
     message.reply(f"❌ Error:\n`{str(e)}`")
