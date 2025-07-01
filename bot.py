@@ -1,140 +1,68 @@
-import logging
-import os
-from telegram import Update
-from telegram.ext import (
-    Application,
-    CommandHandler,
-    MessageHandler,
-    filters,
-    ContextTypes,
-)
-import yt_dlp
-import requests
-import aiohttp
-import aiohttp.web
-import re
-from urllib.parse import urlparse
+import os import logging import yt_dlp from pyrogram import Client, filters from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message from pymongo import MongoClient
 
-# הגדרת לוגים
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
-)
-logger = logging.getLogger(__name__)
+API_ID = int(os.environ.get("API_ID")) API_HASH = os.environ.get("API_HASH") BOT_TOKEN = os.environ.get("BOT_TOKEN") MONGO_URI = os.environ.get("MONGO_URI") MONGO_DB_NAME = os.environ.get("MONGO_DB_NAME")) ADMIN_ID = int(os.environ.get("ADMIN_ID")) LOG_CHANNEL = int(os.environ.get("LOG_CHANNEL"))
 
-# טוקן הבוט (הכנס את הטוקן שלך)
-TOKEN = "8100612494:AAFvDr58G5q9x7ISGi3Ltt-s_Y92wklItBc"
+app = Client("downloader", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN) mongo = MongoClient(MONGO_URI) db = mongo[MONGO_DB_NAME] users_col = db["users"] cookies_path = "cookies.txt"
 
-# פונקציה להורדת קובץ מטלגרם
-async def download_telegram_file(file_url: str, file_path: str, update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("מעבד קישור טלגרם...")
-    try:
-        response = requests.get(file_url, stream=True)
-        total_size = int(response.headers.get("content-length", 0))
-        downloaded = 0
-        with open(file_path, "wb") as f:
-            for chunk in response.iter_content(chunk_size=8192):
-                if chunk:
-                    f.write(chunk)
-                    downloaded += len(chunk)
-                    if total_size > 0:
-                        percent = (downloaded / total_size) * 100
-                        await update.message.reply_text(f"מוריד... {percent:.2f}%")
-        await update.message.reply_text("הורדה הושלמה! מעלה קובץ...")
-        with open(file_path, "rb") as f:
-            await context.bot.send_document(
-                chat_id=update.effective_chat.id, document=f, caption="הקובץ שהורד מטלגרם"
-            )
-        await update.message.reply_text("העלאה הושלמה!")
-        os.remove(file_path)  # מחיקת הקובץ לאחר ההעלאה
-    except Exception as e:
-        await update.message.reply_text(f"שגיאה בהורדת קובץ מטלגרם: {str(e)}")
+logging.basicConfig(level=logging.INFO)
 
-# פונקציה להורדת וידאו מטיקטוק
-async def download_tiktok_video(url: str, update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("מעבד קישור טיקטוק...")
-    try:
-        ydl_opts = {
-            "outtmpl": "tiktok_video.%(ext)s",
-            "progress_hooks": [
-                lambda d: progress_hook(d, update)
-            ],
-            "format": "best",
-        }
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([url])
-        await update.message.reply_text("הורדה הושלמה! מעלה וידאו...")
-        with open("tiktok_video.mp4", "rb") as f:
-            await context.bot.send_video(
-                chat_id=update.effective_chat.id, video=f, caption="הוידאו שהורד מטיקטוק"
-            )
-        await update.message.reply_text("העלאה הושלמה!")
-        os.remove("tiktok_video.mp4")  # מחיקת הקובץ לאחר ההעלאה
-    except Exception as e:
-        await update.message.reply_text(f"שגיאה בהורדת וידאו מטיקטוק: {str(e)}")
+START_MSG = """ Welcome to the Downloader Bot!
 
-# פונקציית התקדמות להורדה מטיקטוק
-async def progress_hook(d, update: Update):
-    if d["status"] == "downloading":
-        percent = d.get("downloaded_bytes", 0) / d.get("total_bytes", 1) * 100
-        await update.message.reply_text(f"מוריד... {percent:.2f}%")
-    elif d["status"] == "finished":
-        await update.message.reply_text("הורדה הושלמה!")
+Just send me a link from TikTok, Instagram, YouTube, Facebook and more, and I will download it for you (up to 500MB). """
 
-# פקודת /start
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "שלום! אני בוט שמוריד תמונות ווידאו מטלגרם וטיקטוק.\n"
-        "שלח לי קישור לתוכן מטלגרם או טיקטוק, ואני אוריד אותו עבורך.\n"
-        "אדווח על התקדמות: עיבוד, הורדה (עם אחוזים), והעלאה.\n"
-        "התחל על ידי שליחת קישור!"
-    )
+BUTTONS = InlineKeyboardMarkup([ [ InlineKeyboardButton("📃 About", callback_data="about"), InlineKeyboardButton("❓ Help", callback_data="help") ], [InlineKeyboardButton("📢 Updates", url="https://t.me/Tj_Bots")] ])
 
-# טיפול בהודעות עם קישורים
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    message_text = update.message.text
-    telegram_regex = r"https?://t\.me/.*"
-    tiktok_regex = r"https?://(www\.)?(vm\.)?tiktok\.com/.*"
+ABOUT_TEXT = """ ╔════❰  𝗔𝗯𝗼𝘂𝘁 𝗧𝗵𝗲 𝗕𝗼𝘁  ❱═❍⊱❁۪۪ ║╭━━━━━━━━━━━━━━━➣ ║┣⪼📃 Bot : Downloader ║┣⪼👦 Creator : @BOSS1480 ║┣⪼🤖 Update : @Tj_Bots ║┣⪼📡 Hosted on : Heroku ║┣⪼🗣️ Language : Python ║┣⪼📚 Library : Pyrogram ║┣⪼🗒️ Version : v2.5.4 ║╰━━━━━━━━━━━━━━━➣ ╚══════════════════❍⊱❁۪۪ """
 
-    if re.match(telegram_regex, message_text):
-        file_name = os.path.basename(urlparse(message_text).path) or "telegram_file"
-        file_path = f"downloads/{file_name}"
-        os.makedirs("downloads", exist_ok=True)
-        await download_telegram_file(message_text, file_path, update, context)
-    elif re.match(tiktok_regex, message_text):
-        await download_tiktok_video(message_text, update, context)
-    else:
-        await update.message.reply_text("אנא שלח קישור תקין מטלגרם או טיקטוק.")
+HELP_TEXT = """ How to use the bot:
 
-# שרת Webhook עבור Koyeb
-async def webhook(request):
-    update = Update.de_json(await request.json(), app.bot)
-    await app.process_update(update)
-    return aiohttp.web.Response(text="OK")
+Just send a video or image link from supported platforms (TikTok, YouTube, etc.)
 
-# הגדרת האפליקציה וה-Webhook
-app = Application.builder().token(TOKEN).build()
-app.add_handler(CommandHandler("start", start))
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+Max file size: 500MB
 
-# הרצת השרת עבור Koyeb
-if __name__ == "__main__":
-    import asyncio
+If YouTube download fails, check that admin has uploaded cookies.txt via reply to /cookies """
 
-    async def main():
-        # הגדרת Webhook
-        webhook_url = "https://your-app.koyeb.app/webhook"  # החלף ב-URL של Koyeb
-        await app.bot.set_webhook(webhook_url)
 
-        # הרצת שרת aiohttp
-        web_app = aiohttp.web.Application()
-        web_app.router.add_post("/webhook", webhook)
-        runner = aiohttp.web.AppRunner(web_app)
-        await runner.setup()
-        site = aiohttp.web.TCPSite(runner, "0.0.0.0", 8000)
-        await site.start()
-        print("Server running on 0.0.0.0:8000")
+@app.on_message(filters.command("start") & filters.private) def start(client, message): user_id = message.from_user.id if not users_col.find_one({"_id": user_id}): users_col.insert_one({"_id": user_id}) try: app.send_message(LOG_CHANNEL, f"#NewUser\nID: {user_id}\nName: {message.from_user.mention}") except: pass message.reply(START_MSG, reply_markup=BUTTONS)
 
-        # שמירה על הרצת הבוט
-        await app.run_polling()
+@app.on_callback_query() def cb_handler(client, cb): if cb.data == "about": cb.message.edit_text(ABOUT_TEXT, reply_markup=InlineKeyboardMarkup([ [InlineKeyboardButton("🔙 Back", callback_data="start")] ])) elif cb.data == "help": cb.message.edit_text(HELP_TEXT, reply_markup=InlineKeyboardMarkup([ [InlineKeyboardButton("🔙 Back", callback_data="start")] ])) elif cb.data == "start": cb.message.edit_text(START_MSG, reply_markup=BUTTONS)
 
-    asyncio.run(main())
+@app.on_message(filters.command("cookies") & filters.reply & filters.user(ADMIN_ID)) def save_cookies(client, message): if message.reply_to_message.document: file = message.reply_to_message.download(file_name=cookies_path) message.reply("✅ cookies.txt saved.")
+
+@app.on_message(filters.private & filters.text & ~filters.command(["start", "cookies"])) def handle_link(client, message: Message): user_id = message.from_user.id url = message.text.strip() try: app.send_message(LOG_CHANNEL, f"#NewLink\nUser: {message.from_user.mention}\nLink: {url}") except: pass processing = message.reply("🔄 Downloading...")
+
+ydl_opts = {
+    'format': 'bestvideo+bestaudio/best',
+    'outtmpl': 'downloads/%(title)s.%(ext)s',
+    'noplaylist': True,
+    'quiet': True,
+    'cookiefile': cookies_path if os.path.exists(cookies_path) else None,
+    'max_filesize': 500*1024*1024,
+}
+
+try:
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=True)
+        file_path = ydl.prepare_filename(info)
+        caption = f"[{info.get('title', 'Downloaded File')}]({url})"
+        reply = app.send_document(
+            message.chat.id,
+            file_path,
+            caption=caption,
+            parse_mode="markdown",
+            reply_to_message_id=message.id
+        )
+        app.send_message(LOG_CHANNEL, f"✅ Uploaded", reply_to_message_id=processing.id)
+except Exception as e:
+    message.reply(f"❌ Error:\n`{str(e)}`")
+    try: app.send_message(LOG_CHANNEL, f"❌ Error: {str(e)}\nFrom: {message.from_user.mention}")
+    except: pass
+finally:
+    processing.delete()
+
+@app.on_message(filters.command("broadcast") & filters.user(ADMIN_ID)) def broadcast(client, message): if not message.reply_to_message: return message.reply("Reply to a message to broadcast.") sent, failed = 0, 0 for user in users_col.find(): try: app.copy_message(user['_id'], message.chat.id, message.reply_to_message.id) sent += 1 except: failed += 1 message.reply(f"✅ Broadcast sent to {sent} users. Failed: {failed}")
+
+@app.on_message(filters.command("stats") & filters.user(ADMIN_ID)) def stats(client, message): count = users_col.count_documents({}) message.reply(f"👥 Total users: {count}")
+
+app.run()
+
