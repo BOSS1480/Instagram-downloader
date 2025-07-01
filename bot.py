@@ -74,22 +74,22 @@ def start(client, message: Message):
         app.send_message(LOG_CHANNEL, f"#NewUser\nID: `{user_id}`\nName: {message.from_user.mention}")
     except:
         pass
-    message.reply(START_MSG, reply_markup=BUTTONS, parse_mode="Markdown")
+    message.reply(START_MSG, reply_markup=BUTTONS, parse_mode="html")
 
 @app.on_callback_query()
 def callback(client, cb):
     if cb.data == "about":
-        cb.message.edit_text(ABOUT_TEXT, reply_markup=BACK_BUTTON, parse_mode="Markdown", disable_web_page_preview=True)
+        cb.message.edit_text(ABOUT_TEXT, reply_markup=BACK_BUTTON, parse_mode="html", disable_web_page_preview=True)
     elif cb.data == "help":
-        cb.message.edit_text(HELP_TEXT, reply_markup=BACK_BUTTON, parse_mode="Markdown")
+        cb.message.edit_text(HELP_TEXT, reply_markup=BACK_BUTTON, parse_mode="html")
     elif cb.data == "start":
-        cb.message.edit_text(START_MSG, reply_markup=BUTTONS, parse_mode="Markdown")
+        cb.message.edit_text(START_MSG, reply_markup=BUTTONS, parse_mode="html")
 
 @app.on_message(filters.command("cookies") & filters.reply & filters.user(ADMIN_ID))
 def save_cookies(client, message: Message):
     if message.reply_to_message and message.reply_to_message.document:
         message.reply_to_message.download(file_name=cookies_path)
-        message.reply("✅ `cookies.txt` saved.", parse_mode="Markdown")
+        message.reply("✅ `cookies.txt` saved.", parse_mode="html")
 
 @app.on_message(filters.command("broadcast") & filters.user(ADMIN_ID))
 def broadcast(client, message: Message):
