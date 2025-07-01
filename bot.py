@@ -2,6 +2,8 @@ import os
 import sys
 import logging
 import yt_dlp
+import mimetypes
+import subprocess
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message
 from pymongo import MongoClient
@@ -14,6 +16,7 @@ MONGO_URI = os.environ.get("MONGO_URI")
 MONGO_DB_NAME = os.environ.get("MONGO_DB_NAME")
 ADMIN_ID = int(os.environ.get("ADMIN_ID"))
 LOG_CHANNEL = int(os.environ.get("LOG_CHANNEL"))
+GITHUB_REPO = os.environ.get("GITHUB_REPO", "")  # optional
 
 app = Client("downloader_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 mongo = MongoClient(MONGO_URI)
@@ -52,8 +55,8 @@ HELP_TEXT = """**ℹ️ How to use the bot**
 
 BUTTONS = InlineKeyboardMarkup([
     [
-        InlineKeyboardButton("📃 About", callback_data="about"),
-        InlineKeyboardButton("❓ Help", callback_data="help")
+        InlineKeyboardButton("❓ Help", callback_data="help"),
+        InlineKeyboardButton("📃 About", callback_data="about")
     ],
     [InlineKeyboardButton("📢 Updates", url="https://t.me/Tj_Bots")]
 ])
@@ -71,22 +74,22 @@ def start(client, message: Message):
         app.send_message(LOG_CHANNEL, f"#NewUser\nID: `{user_id}`\nName: {message.from_user.mention}")
     except:
         pass
-    message.reply(START_MSG, reply_markup=BUTTONS, parse_mode="markdown")
+    message.reply(START_MSG, reply_markup=BUTTONS, parse_mode="Markdown")
 
 @app.on_callback_query()
 def callback(client, cb):
     if cb.data == "about":
-        cb.message.edit_text(ABOUT_TEXT, reply_markup=BACK_BUTTON, parse_mode="markdown", disable_web_page_preview=True)
+        cb.message.edit_text(ABOUT_TEXT, reply_markup=BACK_BUTTON, parse_mode="Markdown", disable_web_page_preview=True)
     elif cb.data == "help":
-        cb.message.edit_text(HELP_TEXT, reply_markup=BACK_BUTTON)
+        cb.message.edit_text(HELP_TEXT, reply_markup=BACK_BUTTON, parse_mode="Markdown")
     elif cb.data == "start":
-        cb.message.edit_text(START_MSG, reply_markup=BUTTONS)
+        cb.message.edit_text(START_MSG, reply_markup=BUTTONS, parse_mode="Markdown")
 
 @app.on_message(filters.command("cookies") & filters.reply & filters.user(ADMIN_ID))
 def save_cookies(client, message: Message):
     if message.reply_to_message and message.reply_to_message.document:
         message.reply_to_message.download(file_name=cookies_path)
-        message.reply("✅ `cookies.txt` saved.", parse_mode="markdown")
+        message.reply("✅ `cookies.txt` saved.", parse_mode="Markdown")
 
 @app.on_message(filters.command("broadcast") & filters.user(ADMIN_ID))
 def broadcast(client, message: Message):
@@ -109,6 +112,12 @@ def stats(client, message: Message):
 @app.on_message(filters.command("restart") & filters.user(ADMIN_ID))
 def restart(client, message: Message):
     message.reply("🔄 Restarting bot...")
+    try:
+        if GITHUB_REPO:
+            subprocess.run(["git", "pull", GITHUB_REPO], check=True)
+            message.reply("✅ Code updated from GitHub.")
+    except Exception as e:
+        message.reply(f"❌ Error pulling GitHub:\n`{e}`", parse_mode="Markdown")
     os.execl(sys.executable, sys.executable, *sys.argv)
 
 @app.on_message(filters.private & filters.text & ~filters.command(["start", "cookies", "broadcast", "stats", "restart"]))
@@ -135,18 +144,19 @@ def handle_links(client, message: Message):
             info = ydl.extract_info(url, download=True)
             file_path = ydl.prepare_filename(info)
             caption = f"[{info.get('title', 'File')}]({url})"
-            mime = info.get("ext", "")
+            ext = info.get("ext", "")
+            mime = mimetypes.guess_type(file_path)[0]
 
-            if mime in ["mp4", "mkv", "webm"]:
-                app.send_video(message.chat.id, file_path, caption=caption, parse_mode="markdown")
-            elif mime in ["jpg", "jpeg", "png", "webp"]:
-                app.send_photo(message.chat.id, file_path, caption=caption, parse_mode="markdown")
+            if mime and mime.startswith("video"):
+                app.send_video(message.chat.id, file_path, caption=caption, parse_mode="Markdown")
+            elif mime and mime.startswith("image"):
+                app.send_photo(message.chat.id, file_path, caption=caption, parse_mode="Markdown")
             else:
-                app.send_document(message.chat.id, file_path, caption=caption, parse_mode="markdown")
+                app.send_document(message.chat.id, file_path, caption=caption, parse_mode="Markdown")
 
             app.send_message(LOG_CHANNEL, f"✅ Uploaded", reply_to_message_id=status.id)
     except Exception as e:
-        message.reply(f"❌ Error: `{str(e)}`", parse_mode="markdown")
+        message.reply(f"❌ Error: `{str(e)}`", parse_mode="Markdown")
         try:
             app.send_message(LOG_CHANNEL, f"❌ Error:\n{str(e)}", disable_web_page_preview=True)
         except:
