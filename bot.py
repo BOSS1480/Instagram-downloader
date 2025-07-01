@@ -16,7 +16,7 @@ MONGO_URI = os.environ.get("MONGO_URI")
 MONGO_DB_NAME = os.environ.get("MONGO_DB_NAME")
 ADMIN_ID = int(os.environ.get("ADMIN_ID"))
 LOG_CHANNEL = int(os.environ.get("LOG_CHANNEL"))
-GITHUB_REPO = os.environ.get("GITHUB_REPO", "")  # optional
+GITHUB_REPO = os.environ.get("GITHUB_REPO", "https://github.com/BOSS1480/Instagram-downloader")  # optional
 
 app = Client("downloader_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 mongo = MongoClient(MONGO_URI)
